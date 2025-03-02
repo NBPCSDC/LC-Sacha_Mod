@@ -20,7 +20,7 @@ namespace Sacha_Mod {
             Logger = base.Logger;
 
             // If you don't want your mod to use a configuration file, you can remove this line, Configuration.cs, and other references.
-            BoundConfig = new PluginConfig(base.Config);
+            //BoundConfig = new PluginConfig(base.Config);
 
             // This should be ran before Network Prefabs are registered.
             InitializeNetworkBehaviours();
@@ -44,16 +44,16 @@ namespace Sacha_Mod {
             // Optionally, we can list which levels we want to add our enemy to, while also specifying the spawn weight for each.
 
             var Sacha_ModLevelRarities = new Dictionary<Levels.LevelTypes, int> {
-                {Levels.LevelTypes.ExperimentationLevel, 20},
-                {Levels.LevelTypes.AssuranceLevel, 60},
-                {Levels.LevelTypes.VowLevel, 40},
-                {Levels.LevelTypes.OffenseLevel, 60},
-                {Levels.LevelTypes.MarchLevel, 50},
-                {Levels.LevelTypes.RendLevel, 50},
-                {Levels.LevelTypes.DineLevel, 65},
+                {Levels.LevelTypes.ExperimentationLevel, 50},
+                {Levels.LevelTypes.AssuranceLevel, 20},
+                {Levels.LevelTypes.VowLevel, 15},
+                {Levels.LevelTypes.OffenseLevel, 15},
+                {Levels.LevelTypes.MarchLevel, 60},
+                {Levels.LevelTypes.RendLevel, 10},
+                {Levels.LevelTypes.DineLevel, 35},
                 {Levels.LevelTypes.TitanLevel, 63},
-                {Levels.LevelTypes.All, 50},     // Affects unset values, with lowest priority (gets overridden by Levels.LevelTypes.Modded)
-                {Levels.LevelTypes.Modded, 60},     // Affects values for modded moons that weren't specified
+                {Levels.LevelTypes.All, 20},     // Affects unset values, with lowest priority (gets overridden by Levels.LevelTypes.Modded)
+                {Levels.LevelTypes.Modded, 20},     // Affects values for modded moons that weren't specified
             };
             // We can also specify custom level rarities
             var Sacha_ModCustomLevelRarities = new Dictionary<string, int> {
@@ -67,9 +67,9 @@ namespace Sacha_Mod {
             NetworkPrefabs.RegisterNetworkPrefab(Sacha_Mod.enemyPrefab);
 
             // For different ways of registering your enemy, see https://github.com/EvaisaDev/LethalLib/blob/main/LethalLib/Modules/Enemies.cs
-            Enemies.RegisterEnemy(Sacha_Mod, BoundConfig.SpawnWeight.Value, Levels.LevelTypes.All, Sacha_ModTN, Sacha_ModTK);
+            //Enemies.RegisterEnemy(Sacha_Mod, BoundConfig.SpawnWeight.Value, Levels.LevelTypes.All, Sacha_ModTN, Sacha_ModTK);
             // For using our rarity tables, we can use the following:
-            // Enemies.RegisterEnemy(Sacha_Mod, Sacha_ModLevelRarities, Sacha_ModCustomLevelRarities, Sacha_ModTN, Sacha_ModTK);
+            Enemies.RegisterEnemy(Sacha_Mod, Sacha_ModLevelRarities, Sacha_ModCustomLevelRarities, Sacha_ModTN, Sacha_ModTK);
             
             Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
         }

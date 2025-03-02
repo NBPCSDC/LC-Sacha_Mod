@@ -1,5 +1,8 @@
 using UnityEditor;
 using UnityEngine;
+using GameNetcodeStuff;
+using Unity.Netcode;
+
 
 namespace Sacha_Mod
 {
@@ -18,8 +21,6 @@ namespace Sacha_Mod
         {
             // Récupère le GameObject parent
             animator = GetComponent<Animator>();
-
-            Debug.Log("Lezgo :" + animator.name + " type : " + animator.GetType());
         }
 
         //a callback for calculating IK
@@ -31,21 +32,24 @@ namespace Sacha_Mod
                 //if the IK is active, set the position and rotation directly to the goal.
                 if (ikActive)
                 {
-
-                    // Set the look target position, if one has been assigned
-                    if (lookObj != null)
-                    {
-                        animator.SetLookAtWeight(1);
-                        animator.SetLookAtPosition(lookObj.position);
-                    }
-
+                    moveHeadClientRpc();
                 }
+            }
+        }
 
-                //if the IK is not active, set the position and rotation of the hand and head back to the original position
-                else
-                {
-                    animator.SetLookAtWeight(0);
-                }
+        [ClientRpc]
+        private void moveHeadClientRpc()
+        {
+            // Set the look target position, if one has been assigned
+            if (lookObj != null)
+            {
+                animator.SetLookAtWeight(1);
+                animator.SetLookAtPosition(lookObj.position);
+            }
+            //if the IK is not active, set the position and rotation of the hand and head back to the original position
+            else
+            {
+                animator.SetLookAtWeight(0);
             }
         }
     }

@@ -30,15 +30,16 @@ namespace Sacha_Mod
         public AudioClip flee_SFX = null!;
         public AudioClip song_SFX = null!;
         public AudioClip stopTarget_SFX = null!;
+        private AudioClip currentAudioClip = null!;
+
 #pragma warning restore 0649
-        Vector3 directionAway;
         Transform farestNodeFromPos = null!;
         float timeSinceHittingLocalPlayer;
         float attackDelay;
         float attackedDelay;
+        float tryAttackDelay; // Delay betwenn attack start and Sacha touch the player
         float randomSoundDelay;
-        float animationDelay;
-        bool isAnimationPlaying;
+        float emoteDelay;
         bool isFirstEncounter;
         bool isSongPlaying = false;
         bool helloDone = false;
@@ -51,20 +52,25 @@ namespace Sacha_Mod
         bool isRunning = false;
         bool hasClaped = false;
         float stamina = 10f;
+        float animationMaxDelay = 10f;
         float maxTargetDistance = 15f;
         bool isStaminaFilling;
         float backupDistance = 3f;
         float idleDistance = 4f;
         bool updateRotation = true;
         float runDistance = 6f;  // Seuil de distance à partir duquel l'ennemi court
+
+        bool useVoiceSFX = true;
+
         enum State
         {
             SearchingForPlayer,
             FollowPlayer,
             IsInCombat,
             RunAway,
-            AttackInProgreess,
+            AttackInProgress,
             ReceiveHitInProgress,
+            EmotePlaying,
             HelloInProgress,
             ClapInProgress
         }
@@ -84,6 +90,7 @@ namespace Sacha_Mod
             isFirstEncounter = true;
             attackDelay = 0;
             attackedDelay = 0;
+            tryAttackDelay = 0;
             enemyRandom = new System.Random(StartOfRound.Instance.randomMapSeed + thisEnemyIndex);
             isDeadAnimationDone = false;
             // NOTE: Add your behavior states in your enemy script in Unity, where you can configure fun stuff
@@ -105,6 +112,7 @@ namespace Sacha_Mod
                     isDeadAnimationDone = true;
                     creatureVoice.Stop();
                     creatureVoice.PlayOneShot(dieSFX);
+                    StopSongClientRpc();
                 }
                 return;
             }
@@ -112,20 +120,33 @@ namespace Sacha_Mod
             timeSinceHittingLocalPlayer += Time.deltaTime;
             attackDelay += Time.deltaTime;
             randomSoundDelay += Time.deltaTime;
-            if (currentBehaviourStateIndex == (int)State.IsInCombat)
-            {
-                attackedDelay += Time.deltaTime;
-            }
 
             var state = currentBehaviourStateIndex;
-            if (targetPlayer != null && state != (int)State.AttackInProgreess)
+
+            switch (state)
             {
-                view.transform.position = targetPlayer.gameplayCamera.transform.position;
+                case (int)State.AttackInProgress:
+                    tryAttackDelay += Time.deltaTime;
+                    break;
+                case (int)State.EmotePlaying:
+                    emoteDelay += Time.deltaTime;
+                    break;
+                case (int)State.IsInCombat:
+                    attackedDelay += Time.deltaTime;
+                    break;
+                default:
+                    break;
+            }
+
+
+            if (targetPlayer != null && state != (int)State.AttackInProgress)
+            {
                 if (updateRotation)
                 {
                     turnCompass.LookAt(targetPlayer.gameplayCamera.transform.position);
                     transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.Euler(new Vector3(0f, turnCompass.eulerAngles.y, 0f)), 4f * Time.deltaTime);
                 }
+                view.transform.position = targetPlayer.gameplayCamera.transform.position; // Only for head
             }
             if (stunNormalizedTimer > 0f)
             {
@@ -139,7 +160,7 @@ namespace Sacha_Mod
             UpdateAnimationClientRpc(agent.velocity.magnitude, dotProduct < 0);
 
             isRunning = agent.velocity.magnitude > walkSpeed + 0.1f;
-            isWalking = agent.velocity.magnitude > 0.1 && !isRunning;
+            isWalking = agent.velocity.magnitude > 0.1f && !isRunning;
 
         }
 
@@ -162,18 +183,22 @@ namespace Sacha_Mod
                 case (int)State.IsInCombat:
                     handleCombatState();
                     break;
-                case (int)State.RunAway:    
+                case (int)State.RunAway:
                     break;
-                case (int)State.AttackInProgreess:
-                    // We don't care about doing anything here
+                case (int)State.AttackInProgress:
                     break;
                 case (int)State.ReceiveHitInProgress:
                     break;
                 case (int)State.HelloInProgress:
                     break;
+                case (int)State.EmotePlaying:
+                    handleEmote();
+                    break;
+                case (int)State.ClapInProgress:
+                    break;
                 default:
                     LogIfDebugBuild("This Behavior State doesn't exist!");
-                break;
+                    break;
             }
 
             updateStamina();
@@ -183,22 +208,12 @@ namespace Sacha_Mod
         {
             if (!isFirstEncounter)
             {
-                if (!isAnimationPlaying && tryDoRandomAnimation())
+                if (tryDoRandomAnimation())
                 {
-                    agent.speed = 0;
                     StopSearch(currentSearch);
-                    isAnimationPlaying = true;
+                    return;
                 }
-                else if (isAnimationPlaying && animationDelay >= 10f)
-                {
-                    agent.speed = walkSpeed;
-                    StartSearch(transform.position);
-                    ResetAnimation();
-                }
-                animationDelay += 0.1f;
             }
-
-            TryPlayRandomSound();
 
             agent.speed = walkSpeed;
             ik_Control.ikActive = false;
@@ -217,7 +232,8 @@ namespace Sacha_Mod
                 {
                     if (helloDone)
                     {
-                        if(enemyRandom.Next(0, 3) == 0){
+                        if (enemyRandom.Next(0, 3) == 0)
+                        {
                             playSong();
                         }
                         SwitchToBehaviourClientRpc((int)State.FollowPlayer);
@@ -226,7 +242,9 @@ namespace Sacha_Mod
                 targetPosition = transform.position;
                 SetDestinationToPosition(targetPosition, checkForPath: false);
                 StopSearch(currentSearch);
+                return;
             }
+            TryPlayRandomSound();
         }
 
         private void handleCombatState()
@@ -244,9 +262,9 @@ namespace Sacha_Mod
             else
             {
                 creatureAnimator.SetBool("isMarteloAttack", false);
-                if (!tryAttack(3))
+                if (!tryAttack(20))
                 {
-                    StickingInFrontOfPlayer();
+                    FollowPlayer();
                 }
             }
         }
@@ -259,30 +277,15 @@ namespace Sacha_Mod
             }
             TryPlayRandomSound();
 
-            // Keep targeting closest player, unless they are over 20 units away and we can't see them.
-            if (isAnimationPlaying)
-            {
-                animationDelay += 0.1f;
-                if (animationDelay >= 20f || Vector3.Distance(transform.position, targetPlayer.transform.position) > runDistance)
-                {
-                    ResetAnimation();
-                }
-                return;
-            }
-
-            if (tryDoRandomAnimation())
-            {
-                isAnimationPlaying = true;
-                targetPosition = transform.position;
-                SetDestinationToPosition(targetPosition, checkForPath: false);
-            }
-
             if (!reactToEmote())
             {
                 creatureAnimator.SetBool("isMarteloAttack", true);
-                if (!tryAttack(6))
+                if (!tryAttack(40))
                 {
-                    StickingInFrontOfPlayer();
+                    if (!tryDoRandomAnimation())
+                    {
+                        FollowPlayer();
+                    }
                 }
             }
         }
@@ -296,27 +299,25 @@ namespace Sacha_Mod
             }
             else if (!TargetClosestPlayerInAnyCase() || Vector3.Distance(transform.position, farestNodeFromPos.position) <= 10f)
             {
-                LogIfDebugBuild("Run away succeed !");
                 StartSearch(transform.position);
                 SwitchToBehaviourClientRpc((int)State.SearchingForPlayer);
-                creatureAnimator.SetBool("isCombat", false);
                 DoAnimationClientRpc("stopRunAway");
                 updateRotation = true;
                 ik_Control.ikActive = true;
             }
         }
 
-        private void ResetAnimation()
+        private void resetEmote()
         {
-            animationDelay = 0;
-            isAnimationPlaying = false;
+            emoteDelay = 0;
             DoAnimationClientRpc("stopEmote");
+            switchBackToRoutineState();
         }
 
 
         private void TryPlayRandomSound()
         {
-            if (randomSoundDelay > 10f && !isVoiceSoundPlaying())
+            if (randomSoundDelay > 15f && !isVoiceSoundPlaying())
             {
                 randomSoundDelay = 0;
                 playRandomSoundFromSounds(randomSound_SFX);
@@ -331,10 +332,7 @@ namespace Sacha_Mod
 
         bool isPlayerStillTarget()
         {
-            if (targetPlayer == null)
-            {
-                return false;
-            }
+            if (targetPlayer == null) return false;
 
             float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.transform.position);
             if (distanceToPlayer > maxTargetDistance && (!TargetClosestPlayerInAnyCase() || !CheckLineOfSightForPosition(targetPlayer.gameplayCamera.transform.position)))
@@ -343,59 +341,33 @@ namespace Sacha_Mod
                 StartSearch(transform.position);
                 creatureAnimator.SetBool("isCombat", false);
                 SwitchToBehaviourClientRpc((int)State.SearchingForPlayer);
-                playSoundFromAudio(stopTarget_SFX, true);
-                StartCoroutine(FadeOutAudioSFX(0.5f));
+                playSound(stopTarget_SFX, true);
+                StopSongClientRpc();
                 return false;
             }
             return true;
         }
 
-        IEnumerator FadeOutAudioSFX(float fadeDuration)
+
+        void handleEmote()
         {
-            float startVolume = creatureSFX.volume;
-
-            while (creatureSFX.volume > 0)
+            if (targetPlayer != null)
             {
-                creatureSFX.volume -= startVolume * Time.deltaTime / fadeDuration;
-                yield return null;
-            }
-
-            creatureSFX.Stop();
-            creatureSFX.volume = startVolume;
-        }
-
-
-        void playRandomSoundFromSounds(AudioClip[] sounds)
-        {
-            if (sounds == null || sounds.Length == 0)
-            {
-                return;
-            }
-            int index = enemyRandom.Next(0, sounds.Length);
-            playSoundFromAudio(sounds[index],true);
-        }
-
-        void playSong()
-        {
-            if (!isSongPlaying)
-            {
-                playSoundFromAudio(song_SFX, false);
-            }
-        }
-
-        void playSoundFromAudio(AudioClip sound, bool useVoiceSFX)
-        {
-            if (useVoiceSFX)
-            {
-                creatureVoice.Stop();
-                creatureVoice.PlayOneShot(sound);
+                if (emoteDelay >= animationMaxDelay || Vector3.Distance(transform.position, targetPlayer.transform.position) > runDistance)
+                {
+                    resetEmote();
+                }
             }
             else
             {
-                creatureSFX.Stop();
-                creatureSFX.PlayOneShot(sound);
+                if (emoteDelay >= animationMaxDelay)
+                {
+                    resetEmote();
+                }
             }
         }
+
+
 
         bool tryAttack(int chance)
         {
@@ -404,30 +376,29 @@ namespace Sacha_Mod
                 if (enemyRandom.Next(0, chance) == 0)
                 {
                     // Attack
+                    attackDelay = 0;
+                    SwitchToBehaviourClientRpc((int)State.AttackInProgress);
                     StartCoroutine(attack());
                     return true;
                 }
-                attackDelay = 0;
             }
             return false;
         }
 
         bool reactToEmote()
         {
-            if (targetPlayer.performingEmote)
-            {
-                if (!hasClaped && !isRunning && !isWalking)
-                {
-                    hasClaped = true;
+            if ((targetPlayer.performingEmote || targetPlayer.disableLookInput)) {
+                if (!hasClaped) {
+                    SwitchToBehaviourClientRpc((int)State.ClapInProgress);
                     StartCoroutine(clap());
-                    return true;
+                    hasClaped = true;
                 }
             }
             else
             {
                 hasClaped = false;
             }
-            return false;
+            return hasClaped;
         }
 
         void updateStamina()
@@ -485,21 +456,13 @@ namespace Sacha_Mod
             return true;
         }
 
-        void StickingInFrontOfPlayer()
+        void FollowPlayer()
         {
-            if (targetPlayer == null || !IsOwner)
-            {
-                return;
-            }
-
-            // Rotation fluide vers le joueur
-            turnCompass.LookAt(targetPlayer.gameplayCamera.transform.position);
-            transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.Euler(new Vector3(0f, turnCompass.eulerAngles.y, 0f)), 4f * Time.deltaTime);
+            if (targetPlayer == null || !IsOwner) return;
 
             // Calcul de la distance entre l'ennemi et le joueur
             float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.transform.position);
 
-            // Logique de déplacement de l'ennemi
             if (distanceToPlayer > runDistance)
             {
                 // Si trop éloigné, l'ennemi court vers le joueur
@@ -542,19 +505,17 @@ namespace Sacha_Mod
             }
         }
 
-
-
         IEnumerator clap()
         {
+            agent.speed = 0;
             yield return new WaitForSeconds(0.5f);
             playRandomSoundFromSounds(clap_SFX);
 
             DoAnimationClientRpc("clap");
 
-            yield return new WaitUntil(() =>
-            !creatureAnimator.GetCurrentAnimatorStateInfo(0).IsName("clap") ||
-            creatureAnimator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f
-            );
+            yield return new WaitForSeconds(3f);
+
+            switchBackToRoutineState();
         }
 
 
@@ -578,67 +539,49 @@ namespace Sacha_Mod
         {
             if (targetPlayer == null || Vector3.Distance(transform.position, targetPlayer.transform.position) >= idleDistance)
             {
+                switchBackToRoutineState();
                 yield break;
             }
-
-            SwitchToBehaviourClientRpc((int)State.AttackInProgreess);
-            agent.speed = 5f;
+            agent.speed = 4f;
+            tryAttackDelay = 0f;
             float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.transform.position);
-            // Tant que l'attaque ne doit pas être lancée, on continue à suivre le joueur
             while (distanceToPlayer > 1f)
             {
-                if(distanceToPlayer > runDistance)
+                if (distanceToPlayer > runDistance || tryAttackDelay >= 6f)
                 {
-                    if (attackedDelay != 0)
-                    {
-                        SwitchToBehaviourClientRpc((int)State.IsInCombat);
-                    }
-                    else
-                    {
-                        SwitchToBehaviourClientRpc((int)State.FollowPlayer);
-                    }
+                    switchBackToRoutineState();
                     yield break;
                 }
-                // Mise à jour dynamique de la position cible
-                Vector3 direction = (transform.position - targetPlayer.transform.position).normalized;
-                targetPosition = targetPlayer.transform.position + direction * 0.5f;
-                SetDestinationToPosition(targetPosition);
-                distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.transform.position);
-                yield return null; // Attendre le prochain frame pour recalculer la position
-            }
 
-            if(Vector3.Distance(transform.position, targetPlayer.transform.position) > 2f)
-            {
-                DoAnimationClientRpc("attack");
-                // Attendre que l'animation soit réellement terminée (optionnel si la durée est bien synchronisée)
-                yield return null;
-                yield return new WaitUntil(() =>
-                    !(creatureAnimator.GetCurrentAnimatorStateInfo(0).IsName("Hit") ||
-                    creatureAnimator.GetCurrentAnimatorStateInfo(0).IsName("martelo")) ||
-                    creatureAnimator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f
-                );
+                if(targetPlayer != null)
+                {
+                    Vector3 direction = (transform.position - targetPlayer.transform.position).normalized;
+                    targetPosition = targetPlayer.transform.position + direction * 0.5f;
+                    SetDestinationToPosition(targetPosition);
+                    distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.transform.position);
+                    yield return null;
+                }
+                else
+                {
+                    switchBackToRoutineState();
+                    yield break;
+                }
 
-
-                // Appliquer les dégâts au joueur
-                attackHitClientRpc();
             }
-
-            if (attackedDelay != 0)
-            {
-                SwitchToBehaviourClientRpc((int)State.IsInCombat);
-            }
-            else
-            {
-                SwitchToBehaviourClientRpc((int)State.FollowPlayer);
-            }
+            DoAnimationClientRpc("attack");
+            yield return new WaitUntil(() =>
+                !(creatureAnimator.GetCurrentAnimatorStateInfo(0).IsName("Hit") ||
+                creatureAnimator.GetCurrentAnimatorStateInfo(0).IsName("martelo")) ||
+                creatureAnimator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f
+            );
+            attackHitClientRpc();
+            switchBackToRoutineState();
         }
 
         IEnumerator TakeHit(int force)
         {
             SwitchToBehaviourClientRpc((int)State.ReceiveHitInProgress);
-            StartCoroutine(FadeOutAudioSFX(0.5f));
             ik_Control.ikActive = false;
-            // Jouer l'animation de prise de coup
             creatureAnimator.SetInteger("hitIndex", enemyRandom.Next(0, 2));
             DoAnimationClientRpc("hit");
             playRandomSoundFromSounds(hit_SFX);
@@ -646,21 +589,19 @@ namespace Sacha_Mod
             if (enemyHP - force <= 0)
             {
                 StopCoroutine(attack());
+                StopSongClientRpc();
                 SwitchToBehaviourClientRpc((int)State.RunAway);
                 creatureAnimator.SetBool("isCombat", false);
-                playSoundFromAudio(flee_SFX,true);
+                playSound(flee_SFX, true);
                 DoAnimationClientRpc("runAway");
                 updateRotation = false;
                 farestNodeFromPos = ChooseFarthestNodeFromPosition(targetPlayer.transform.position);
                 targetPosition = farestNodeFromPos.position;
                 SetDestinationToPosition(targetPosition, checkForPath: true);
-                directionAway = (transform.position - targetPlayer.transform.position).normalized;
                 agent.speed = runSpeed * 3f;
-                ik_Control.ikActive = false;
             }
             else
             {
-                // Attendre que l'animation soit terminée avant de continuer
                 SwitchToBehaviourClientRpc((int)State.IsInCombat);
                 creatureAnimator.SetBool("isCombat", true);
                 attackedDelay = 0f;
@@ -672,6 +613,31 @@ namespace Sacha_Mod
         }
 
 
+        /**
+         * Routine States are all states we need for Sacha to work such as Search, Follow or Combat 
+        */
+        void switchBackToRoutineState()
+        {
+            agent.speed = walkSpeed;
+            if(targetPlayer != null)
+            {
+                if (attackedDelay != 0)
+                {
+                    SwitchToBehaviourClientRpc((int)State.IsInCombat);
+                }
+                else
+                {
+                    SwitchToBehaviourClientRpc((int)State.FollowPlayer);
+                }
+            }
+            else
+            {
+                SwitchToBehaviourClientRpc((int)State.SearchingForPlayer);
+            }
+
+        }
+
+
         bool IsPlayerLookingAtEnemy()
         {
             if (targetPlayer == null) return false;
@@ -679,7 +645,6 @@ namespace Sacha_Mod
             Vector3 directionToEnemy = (transform.position - targetPlayer.gameplayCamera.transform.position).normalized;
             float dotProduct = Vector3.Dot(targetPlayer.gameplayCamera.transform.forward, directionToEnemy);
 
-            // Vérifier si le joueur regarde l'ennemi (angle correct)
             if (dotProduct > 0.50f)
             {
                 return CheckLineOfSightForPosition(targetPlayer.gameplayCamera.transform.position);
@@ -689,29 +654,30 @@ namespace Sacha_Mod
 
         public override void OnCollideWithPlayer(Collider other)
         {
-            if (timeSinceHittingLocalPlayer < 1f || currentBehaviourStateIndex == (int)State.RunAway || currentBehaviourStateIndex == (int)State.AttackInProgreess)
-            {
-                return;
-            }
+            if (timeSinceHittingLocalPlayer < 1f || currentBehaviourStateIndex == (int)State.RunAway || currentBehaviourStateIndex == (int)State.AttackInProgress) return;
+
             PlayerControllerB playerControllerB = MeetsStandardPlayerCollisionConditions(other);
             if (playerControllerB != null)
             {
+                if(currentBehaviourStateIndex == (int)State.EmotePlaying)
+                {
+                    resetEmote();
+                }
                 LogIfDebugBuild("Sacha Collision with Player!");
                 timeSinceHittingLocalPlayer = 0f;
                 creatureAnimator.SetBool("isMarteloAttack", false);
                 DoAnimationClientRpc("attack");
                 playRandomSoundFromSounds(attack_SFX);
-                playerControllerB.DamagePlayer(20);
+                playerControllerB.DamagePlayer(25);
+                switchBackToRoutineState();
             }
         }
 
         public override void HitEnemy(int force = 1, PlayerControllerB? playerWhoHit = null, bool playHitSFX = false, int hitID = -1)
         {
             base.HitEnemy(force, playerWhoHit, playHitSFX, hitID);
-            if (isEnemyDead)
-            {
-                return;
-            }
+            if (isEnemyDead) return;
+
             enemyHP -= force;
             if (IsOwner)
             {
@@ -737,11 +703,12 @@ namespace Sacha_Mod
 
         bool tryDoRandomAnimation()
         {
-            if (enemyRandom.Next(0, 100) == 0)
+            if (enemyRandom.Next(0, 60) == 0)
             {
                 creatureAnimator.SetInteger("randomEmote", enemyRandom.Next(0, 4));
                 DoAnimationClientRpc("startEmote");
-                isAnimationPlaying = true;
+                SwitchToBehaviourClientRpc((int)State.EmotePlaying);
+                agent.speed = 0;
                 return true;
             }
             return false;
@@ -764,7 +731,6 @@ namespace Sacha_Mod
         [ClientRpc]
         public void attackHitClientRpc()
         {
-            LogIfDebugBuild("attackHitClientRPC");
             playRandomSoundFromSounds(attack_SFX);
             int playerLayer = 1 << 3; // This can be found from the game's Asset Ripper output in Unity
             Collider[] hitColliders = Physics.OverlapBox(attackArea.position, attackArea.localScale, Quaternion.identity, playerLayer);
@@ -777,10 +743,56 @@ namespace Sacha_Mod
                     {
                         LogIfDebugBuild("Sacha hit player!");
                         timeSinceHittingLocalPlayer = 0f;
-                        playerControllerB.DamagePlayer(20);
+                        playerControllerB.DamagePlayer(30);
                     }
                 }
             }
+        }
+
+
+        /***********************
+        * AUDIO Utils
+        ************************/
+
+        void playRandomSoundFromSounds(AudioClip[] sounds)
+        {
+            if (sounds == null || sounds.Length == 0) return;
+            int index = enemyRandom.Next(0, sounds.Length);
+            playSound(sounds[index], true);
+        }
+
+        void playSong(){if (!isSongPlaying) playSound(song_SFX, false);}
+
+        // Méthode pour jouer un son à partir d'un AudioClip en local
+        void playSound(AudioClip sound, bool useVoice)
+        {
+            currentAudioClip = sound;
+            useVoiceSFX = useVoice;
+            PlaySoundFromAudioClientRpc();
+        }
+
+        [ClientRpc]
+        public void PlaySoundFromAudioClientRpc()
+        {
+            if (currentAudioClip != null)
+            {
+                if (useVoiceSFX)
+                {
+                    creatureVoice.Stop();
+                    creatureVoice.PlayOneShot(currentAudioClip);
+                }
+                else
+                {
+                    creatureSFX.Stop();
+                    creatureSFX.PlayOneShot(currentAudioClip);
+                }
+            }
+        }
+
+        [ClientRpc]
+        public void StopSongClientRpc()
+        {
+            creatureSFX.Stop();
         }
     }
 }
