@@ -44,14 +44,14 @@ namespace Sacha_Mod {
             // Optionally, we can list which levels we want to add our enemy to, while also specifying the spawn weight for each.
 
             var Sacha_ModLevelRarities = new Dictionary<Levels.LevelTypes, int> {
-                {Levels.LevelTypes.ExperimentationLevel, 50},
+                {Levels.LevelTypes.ExperimentationLevel, 40},
                 {Levels.LevelTypes.AssuranceLevel, 20},
                 {Levels.LevelTypes.VowLevel, 15},
                 {Levels.LevelTypes.OffenseLevel, 15},
-                {Levels.LevelTypes.MarchLevel, 60},
+                {Levels.LevelTypes.MarchLevel, 40},
                 {Levels.LevelTypes.RendLevel, 10},
                 {Levels.LevelTypes.DineLevel, 35},
-                {Levels.LevelTypes.TitanLevel, 63},
+                {Levels.LevelTypes.TitanLevel, 40},
                 {Levels.LevelTypes.All, 20},     // Affects unset values, with lowest priority (gets overridden by Levels.LevelTypes.Modded)
                 {Levels.LevelTypes.Modded, 20},     // Affects values for modded moons that weren't specified
             };

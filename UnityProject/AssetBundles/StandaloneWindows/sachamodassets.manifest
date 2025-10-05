@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 2418518747
+CRC: 1480713081
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: f30d94d5c75080a776e0ed215bb3db29
+    Hash: 75094839e5ea2b19ea1e97fc10d53899
   TypeTreeHash:
     serializedVersion: 2
-    Hash: 88d82b1625532503e217a8f845df3816
+    Hash: 1d3460b0dedab77fc180c4089f71beff
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: f30d94d5c75080a776e0ed215bb3db29
+    Hash: 75094839e5ea2b19ea1e97fc10d53899
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -45,13 +45,13 @@ ClassTypes:
 - Class: 95
   Script: {instanceID: 0}
 - Class: 114
+  Script: {fileID: 316759646, guid: 40646d966f7700f41802dd38c9b7a9d4, type: 3}
+- Class: 114
+  Script: {fileID: -1316198900, guid: 40646d966f7700f41802dd38c9b7a9d4, type: 3}
+- Class: 114
+  Script: {fileID: -53608008, guid: 40646d966f7700f41802dd38c9b7a9d4, type: 3}
+- Class: 114
   Script: {fileID: 11500000, guid: 65d3fcb39dd67306e9bb17a603308070, type: 3}
-- Class: 114
-  Script: {fileID: -196901620, guid: 869b885a4ebabb24c839767b60b6ff6d, type: 3}
-- Class: 114
-  Script: {fileID: -1316198900, guid: 869b885a4ebabb24c839767b60b6ff6d, type: 3}
-- Class: 114
-  Script: {fileID: -53608008, guid: 869b885a4ebabb24c839767b60b6ff6d, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: 04f75356a7e9c978bddc7d568e58a50b, type: 3}
 - Class: 114
@@ -82,5 +82,6 @@ SerializeReferenceClassIdentifiers:
 Assets:
 - Assets/ModAssets/Sacha/Sacha.asset
 - Assets/ModAssets/Sacha/Bestiary/SachTK.asset
+- Assets/ModAssets/Sacha/Models/Sacha/SachaObj.prefab
 - Assets/ModAssets/Sacha/Bestiary/SachaTN.asset
 Dependencies: []

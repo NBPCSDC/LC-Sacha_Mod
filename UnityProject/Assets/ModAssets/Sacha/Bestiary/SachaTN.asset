@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: SachaTN
   m_EditorClassIdentifier: 
   displayText: "Sacha\n\nSigurd's danger level: ?%\n\nScientific name: Sachus Cryptocus\n\nJ'ai
-    entendu groov\xE9 dans le banks... Puis j'ai vu l'horreur - Sigurd"
+    entendu groov\xE9 dans le banks... Puis j'ai vu l'horreur"
   terminalEvent: 
   clearPreviousText: 1
   maxCharactersToType: 35

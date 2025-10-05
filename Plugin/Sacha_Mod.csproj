@@ -52,6 +52,8 @@
     viewing Private Information in stack traces.
     -->
     <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))=./</PathMap>
+    <GameDirectory>C:/Program Files (x86)/Steam/steamapps/common/Lethal Company/</GameDirectory>
+    <PluginsDirectory>$(GameDirectory)BepInEx/plugins/</PluginsDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -67,15 +69,42 @@
   </ItemGroup>
 
   <!-- References - Game Assemblies -->
-  <ItemGroup Condition="$(CI) != 'true'">
-    <Reference Include="$(ManagedDirectory)Assembly-CSharp.dll" Publicize="true" Private="false"/>
-    <Reference Include="$(ManagedDirectory)Unity.Netcode.Runtime.dll"/>
-  </ItemGroup>
 
   <!-- Package References - Game Assemblies -->
   <ItemGroup Condition="$(CI) == 'true'">
-    <PackageReference Include="LethalCompany.GameLibs.Steam" Version="*-*" Publicize="true" PrivateAssets="all"/>
+    <PackageReference Include="LethalCompany.GameLibs.Steam" Version="*-*" Publicize="true" PrivateAssets="all" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Lethal Company\BepInEx\core\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Lethal Company\Lethal Company_Data\Managed\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Lethal Company\BepInEx\core\BepInEx.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Netcode.Runtime">
+      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Lethal Company\Lethal Company_Data\Managed\Unity.Netcode.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Lethal Company\Lethal Company_Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Lethal Company\Lethal Company_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+
+  <Target Name="CopyToTestProfile" DependsOnTargets="NetcodePatch" AfterTargets="NetcodePatch">
+    <MakeDir
+      Directories="$(PluginsDirectory)$(AssemblyName)-DEV/"
+      Condition="!Exists('$(PluginsDirectory)$(AssemblyName)-DEV/')"
+    />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginsDirectory)$(AssemblyName)-DEV/"/>
+    <Copy SourceFiles="../UnityProject/AssetBundles/StandaloneWindows/sachamodassets" DestinationFolder="$(PluginsDirectory)$(AssemblyName)-DEV/"/>
+    <Exec Command="echo '[csproj] Mod files copied to $(PluginsDirectory)$(AssemblyName)-DEV/'" />
+  </Target>
 
   <!-- Allows us to use Rpc methods. See https://github.com/EvaisaDev/UnityNetcodePatcher -->
   <!-- This MSBuild option does not work in Visual Studio, using cli option for now
@@ -93,6 +122,6 @@
   <!-- Build our Thunderstore package when making a release build. This does not publish our package. -->
   <!-- For more information about tcli, see https://github.com/thunderstore-io/thunderstore-cli/wiki -->
   <Target Name="PackThunderstore" DependsOnTargets="NetcodePatch" AfterTargets="PostBuildEvent" Condition="$(Configuration) == 'Release'">
-    <Exec Command="dotnet tcli build --config-path &quot;$(ProjectDir)Thunderstore/thunderstore.toml&quot; --package-version $(Version) --package-name $(Product) --package-namespace $(ThunderstoreTeam)"  />
+    <Exec Command="dotnet tcli build --config-path &quot;$(ProjectDir)Thunderstore/thunderstore.toml&quot; --package-version $(Version) --package-name $(Product) --package-namespace $(ThunderstoreTeam)" />
   </Target>
 </Project>

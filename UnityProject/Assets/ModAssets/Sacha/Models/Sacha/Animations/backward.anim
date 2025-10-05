@@ -27773,9 +27773,10 @@ AnimationClip:
     intParameter: 0
     messageOptions: 0
   - time: 0.45
-    functionName: playWalkSoundClientRpc
+    functionName: WalkSound
     data: 
-    objectReferenceParameter: {fileID: 0}
+    objectReferenceParameter: {fileID: 316759646, guid: 40646d966f7700f41802dd38c9b7a9d4,
+      type: 3}
     floatParameter: 0
     intParameter: 0
     messageOptions: 0

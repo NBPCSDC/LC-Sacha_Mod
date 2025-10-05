@@ -11,8 +11,8 @@ Il vous traque sans relâche et ne vous lâchera pas d'une semelle, tout en bala
 
 ### 🔸 Mécaniques de Sacha :
 - **Danse non-stop** 🕺  
-- **4 HP** 💙  
-- **Attaque le joueur** (3 coups pour vous tuer) 🔪  
+- **3 HP** 💙  
+- **Frappe comme une lopette** (10 coups pour vous tuer) 🔪  
 - **Balance des phrases absurdes** 🤡  
 - **Suivi intensif du joueur** 🎯  
 
